@@ -1,0 +1,53 @@
+library(EnhancedVolcano)
+library(DESeq2)
+library(edgeR)
+library(DEFormats)
+library(tidyverse)
+library(ggfortify)
+library(ggtext)
+library(ggpubr)
+library(dplyr)
+
+
+#load raw data ----
+
+count_matrix_path <- read.table("C:/Users/bop21gwh/bioinformatics/salmon.gene.counts.matrix")
+head(count_matrix_path)
+sample_info <- read.csv("C:/Users/bop21gwh/Documents/PhD work/genomics/H.m/sample_info_with_sample_id.csv", row.names = NULL)
+# extract colnames to change count matrix colnames
+# new
+head(sample_info)
+
+
+dds_all <- DESeqDataSetFromMatrix(round(count_matrix_path), colData = sample_info, design = ~1)
+
+# runs DESeq2
+dds <- DESeq(dds_all)
+dds
+
+# Saves the dds object created from DESeq2
+saveRDS(dds, file = "C:/Users/bop21gwh/Documents/PhD work/genomics/H.m/dds_object.rds")
+
+print(dds)
+class(dds)
+
+
+## saved dds object
+import <-readRDS("C:/Users/bop21gwh/Documents/PhD work/genomics/H.m/dds_object.rds")
+
+# creates a log2foldchange column
+result <- results(import)
+result
+
+
+
+# Add a small constant to p-values
+result$pvalue[result$pvalue == 0] <- 1e-10  # Adjust the value as needed
+
+
+plot(result$log2FoldChange, -log10(result$padj), 
+     main = "Volcano Plot", 
+     xlab = "log2 Fold Change", 
+     ylab = "-log10 Adjusted P-value",
+     pch = 20,
+     col = ifelse(result$padj < 0.05, "red", "black"))
