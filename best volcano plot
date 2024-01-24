@@ -1,0 +1,46 @@
+library(EnhancedVolcano)
+library(DESeq2)
+library(edgeR)
+library(DEFormats)
+library(tidyverse)
+library(ggfortify)
+library(ggtext)
+library(ggpubr)
+library(dplyr)
+
+
+#load raw data ----
+count_matrix_path <- read.table("C:/Users/bop21gwh/bioinformatics/salmon.gene.counts.matrix")
+head(count_matrix_path)
+#sample_info <- read.csv("C:/Users/bop21gwh/Documents/PhD work/genomics/H.m/sample_info_with_sample_id.csv", row.names = NULL)
+sample_info <- read.csv("C:/Users/bop21gwh/Documents/PhD work/genomics/H.m/sample_info_with_sample_id.csv", header = TRUE, sep = ",")
+# extract colnames to change count matrix colnames
+# new
+head(sample_info)
+
+#dds_all <- DESeqDataSetFromMatrix(round(count_matrix_path), colData = sample_info, design =~sample_id)
+# cant inlcude numbers in the name
+dds_all <- DESeqDataSetFromMatrix(round(count_matrix_path), colData = sample_info, design =~Tissue)
+
+
+dds <- DESeq(dds_all)
+
+
+saveRDS(dds, file = "C:/Users/bop21gwh/Documents/PhD work/genomics/H.m/dds_Tissue_object.rds")
+import <-readRDS("C:/Users/bop21gwh/Documents/PhD work/genomics/H.m/dds_Tissue_object.rds")
+
+# creates a log2foldchange column
+#The data frame needed for the volcano plot comes from the results function of DESeq2. Something like this:-
+#This will give you the log2FoldChange and padj columns that are needed to make the volcano plot. It is completely possible to do this without the annotation data. 
+result <- results(import, tidy=TRUE)
+class(result)
+head(result)
+
+# incase lab isnt needed "EnhancedVolcano(result, x = 'log2FoldChange', y = 'padj')"
+EnhancedVolcano(result, lab = rownames(result), x = 'log2FoldChange', y = 'padj')
+
+
+
+
+#The annotation is useful for labelling known gene names, but you can make the plot without if you just want to see the general distribution of differential expression results
+
