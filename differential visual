@@ -1,0 +1,164 @@
+# Load required library
+library(DESeq2)
+library(ggplot2)
+library(ggrepel)
+library(GenomicFeatures)
+library(EnhancedVolcano)
+library(clusterProfiler)
+
+
+
+# Set the file path for count data
+countdata_mb_path <- "C:/Users/bop21gwh/Documents/PhD work/genomics/Hisat2/hisat2_mb.txt"
+
+# Read the count data from a tab-separated text file
+countdata_mb <- read.table(countdata_mb_path, header = TRUE, sep = "\t")
+
+head(countdata_mb)
+print(colnames(countdata_mb))
+
+# Remove columns 2 through 8 from countdata_hm
+countdata_mb_filtered <- countdata_mb[, -c(2:8)]
+
+print(colnames(countdata_mb_filtered))
+
+# Set the file path for metadata
+metadata_path <- "C:/Users/bop21gwh/Documents/PhD work/genomics/Hisat2/metadata.csv"
+
+# Read the metadata from a CSV file
+metadata <- read.csv(metadata_path)
+
+metadata_filtered <- metadata[metadata$Species != "H.m", ]
+
+print(metadata_filtered)
+
+# Extract sample names from metadata_filtered
+metadata_samples <- metadata_filtered$Sample
+
+# Extract column names from countdata_mb_filtered (excluding the 'Geneid' column)
+countdata_mb_samples <- colnames(countdata_mb_filtered)[-1]
+
+# Check if sample names in metadata_filtered match the column names in countdata_mb_filtered
+if (!all(metadata_samples %in% countdata_mb_samples)) {
+  stop("Not all sample names in metadata_filtered are present in countdata_mb_filtered.")
+}
+if (!all(countdata_mb_samples %in% metadata_samples)) {
+  stop("Not all sample names in countdata_mb_filtered are present in metadata_filtered.")
+}
+
+# Ensure all columns in countdata_mb_filtered are present in metadata_filtered$Sample
+countdata_filtered <- countdata_mb_filtered[, match(metadata_samples, countdata_mb_samples) + 1]
+
+# Set row names to the gene IDs from the first column of countdata_mb_filtered
+rownames(countdata_filtered) <- countdata_mb_filtered$Geneid
+
+
+# Create DESeq2 dataset
+dds <- DESeqDataSetFromMatrix(
+  countData = round(countdata_filtered),
+  colData = metadata_filtered,
+  design = ~ Condition  # Adjust 'Condition' to the appropriate variable from your metadata
+)
+
+# Run DESeq2 analysis
+dds <- DESeq(dds)
+colnames(print(dds))
+results(dds)
+resultsNames(dds)
+
+#########################################################
+#########################################################
+########################volcano plot 
+# Run DESeq2 analysis
+dds <- DESeq(dds)
+
+# Perform variance stabilizing transformation (VST)
+vsd <- vst(dds, blind = FALSE)
+
+# Extract results condition is the column and the other 2 numerator and denom are 2 factors in condition
+#you want to compare
+res <- results(dds, contrast = c('Condition', 'Fertilizer', 'No_ants'))
+
+columns(txdb)
+
+
+# Annotate results with gene symbols from the TxDb object
+res$symbol <- mapIds(txdb, keys = rownames(res), column = "GENEID", keytype = "GENEID", multiVals = "first")
+
+
+
+
+
+# Generate a volcano plot
+volcano_plot <- EnhancedVolcano(res,
+                                lab = res$symbol,
+                                x = 'log2FoldChange',
+                                y = 'pvalue',
+                                title = 'Volcano Plot',
+                                xlab = 'Log2 Fold Change',
+                                ylab = '-Log10 P-value')
+
+# Display the volcano plot
+print(volcano_plot)
+#######################################
+
+##########################################################
+#########################################################
+#########################################################
+#PCA
+
+pca_data <- plotPCA(vsd, intgroup = c('Tissue', 'Species', 'Condition'), returnData = TRUE)
+pca_plot <- ggplot(pca_data, aes(x = PC1, y = PC2, color = Tissue, shape = Condition)) +
+  geom_point(size = 3) +
+  theme_bw()+
+  geom_text_repel(aes(label = Tissue), size = 3, box.padding = 0.5, max.overlaps = Inf)+
+  labs(
+    title = "Myrmecodia beccarii PCA Plot",
+    x = "Principal Component 1",
+    y = "Principal Component 2",
+    color = "Condition",
+    shape = "Condition"
+  )# Add tissue labels
+
+
+print(pca_plot)
+
+#########################################################
+
+
+
+
+
+
+
+#########################################################
+#########################################################
+
+# Perform Gene Set Enrichment Analysis (GSEA) using clusterProfiler
+gene_list <- res$log2FoldChange
+names(gene_list) <- rownames(res)
+gene_list <- sort(gene_list, decreasing = TRUE)
+
+# Run GO enrichment analysis
+gsea_result <- gseGO(
+  geneList = gene_list, 
+  OrgDb = org.Hs.eg.db,   # Adjust for your species
+  ont = "BP",             # Biological Process, can use "MF" or "CC" as well
+  keyType = "ENSEMBL",    # Ensure this matches your gene ID type
+  minGSSize = 10, 
+  maxGSSize = 500, 
+  pvalueCutoff = 0.05
+)
+
+# Visualize GSEA results with dot plot
+dotplot(gsea_result, showCategory = 20) + ggtitle("GSEA GO Biological Process")
+
+# For KEGG enrichment analysis (optional)
+gsea_kegg <- gseKEGG(
+  geneList = gene_list, 
+  organism = 'hsa',   # Adjust 'hsa' to your organism
+  pvalueCutoff = 0.05
+)
+
+dotplot(gsea_kegg, showCategory = 20) + ggtitle("GSEA KEGG Pathways")
+
