@@ -1,0 +1,97 @@
+# Load required library
+library(DESeq2)
+
+# Set the file path for count data
+countdata_hm_path <- "C:/Users/bop21gwh/Documents/PhD work/genomics/Hisat2/hisat2_hm.txt"
+head(countdata_hm_path)
+# Read the count data from a tab-separated text file
+countdata_hm <- read.table(countdata_hm_path, header = TRUE, sep = "\t")
+head(countdata_hm)
+print(colnames(countdata_hm))
+# Remove columns 2 through 8 from countdata_hm
+countdata_hm_filtered <- countdata_hm[, -c(2:8)]
+
+# Set the file path for metadata
+metadata_path <- "C:/Users/bop21gwh/Documents/PhD work/genomics/Hisat2/metadata.csv"
+
+# Read the metadata from a CSV file
+metadata <- read.csv(metadata_path)
+print(rownames(metadata))
+# Remove rows where Species is "M.b"
+metadata_filtered <- metadata[metadata$Species != "M.b", ]
+
+# Extract sample names from metadata_filtered
+metadata_samples <- metadata_filtered$Sample
+
+# Extract column names from countdata_hm_filtered (excluding the 'Geneid' column)
+countdata_samples <- colnames(countdata_hm_filtered)[-1]
+
+# Check if sample names in metadata_filtered match the column names in countdata_hm_filtered
+if (!all(metadata_samples %in% countdata_samples)) {
+  stop("Not all sample names in metadata_filtered are present in countdata_hm_filtered.")
+}
+if (!all(countdata_samples %in% metadata_samples)) {
+  stop("Not all sample names in countdata_hm_filtered are present in metadata_filtered.")
+}Ensure all columns in countdata_hm_filtered are present in metadata_filtered$Sample
+countdata_filtered <- countdata_hm_filtered[, match(metadata_samples, countdata_samples) + 1]
+
+# Set row names to the gene IDs from the first column of countdata_hm_filtered
+rownames(countdata_filtered) <- countdata_hm_filtered$Geneid
+
+
+# Verify dimensions
+if (ncol(countdata_filtered) != nrow(metadata_filtered)) {
+  stop("Number of columns in countdata_filtered does not match number of rows in metadata_filtered.")
+}
+
+# Create DESeq2 dataset
+dds <- DESeqDataSetFromMatrix(
+  countData = round(countdata_filtered),
+  colData = metadata_filtered,
+  design = ~ Condition  # Adjust 'Condition' to the appropriate variable from your metadata
+)
+
+# Print the DESeq2 dataset to verify
+print(dds)
+
+
+
+
+# Run DESeq2 analysis
+dds <- DESeq(dds)
+
+# Perform variance stabilizing transformation (VST)
+vsd <- vst(dds, blind = FALSE)
+##########################################################################
+
+#plotPCA(vsd,intgroup="Condition",returnData = TRUE) %>% 
+  #dplyr::rename(Run = name) %>% 
+  #left_join(metadata_filtered) %>% 
+  #ggplot(aes(x = PC1, y = PC2,col=group)) + geom_point()+
+  #geom_text_repel(aes(label = Tissue), size = 3, box.padding = 0.5)  # Add tissue labels
+
+pca_data <- plotPCA(vsd, intgroup = c('Tissue', 'Species', 'Condition'), returnData = TRUE)
+pca_plot <- ggplot(pca_data, aes(x = PC1, y = PC2, color = Tissue, shape = Condition)) +
+  geom_point(size = 3) +
+  theme_bw()+
+  geom_text_repel(aes(label = Tissue), size = 3, box.padding = 0.5, max.overlaps = Inf)+
+  labs(
+    title = "Hydnophytum moseleyanum PCA Plot",
+    x = "Principal Component 1",
+    y = "Principal Component 2",
+    color = "Condition",
+    shape = "Condition"
+  )# Add tissue labels
+
+
+print(pca_plot)
+
+
+
+######################################################
+# Obtain results
+results <- results(dds)
+
+
+# Print the results
+print(head(results))
