@@ -67,7 +67,7 @@ gene_info <- getBM(
 
 # View the first few rows of the retrieved data
 head(gene_info)
-#################################################### Correct line
+#################################################### 
 # Inspect the first few rows of both data sets
 head(merged_results$Subject)
 head(gene_info$uniprotswissprot)
@@ -98,7 +98,7 @@ gene_list <- na.omit(merged_results_with_gene_info$uniprotswissprot)
 
 No
 
-########################### Correct line Enrichment analysis ###############
+################# Enrichment analysis ###############
 # Assuming you have UniProt IDs in the 'Subject' column of your dataframe
 uniprot_ids <- merged_results$Subject
 
