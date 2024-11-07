@@ -1,0 +1,65 @@
+# Install and load the `readr` package if you haven’t already
+if (!requireNamespace("readr", quietly = TRUE)) {
+  install.packages("readr")
+}
+library(readr)
+
+# Define the file path and load the data
+interproscan_path <- "C:/Users/bop21gwh/Documents/PhD work/hisat/output_file_m.b.tsv"
+interpro_data <- read_tsv(interproscan_path)
+
+# Check the first few rows to ensure it loaded correctly
+head(interpro_data)
+
+# Check the column names and structure of the data
+colnames(interpro_data)
+head(interpro_data)
+
+
+# Examine the column names in your data to identify GO term or description columns
+colnames(interpro_data)
+
+# Assume there's a column with descriptions or GO terms, let's call it "Description" here
+# Adjust "Description" to the actual name in your data
+
+# Filter for rows containing the term "nitrate"
+nitrate_genes <- interpro_data %>%
+  filter(grepl("nitrate", Description, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+head(nitrate_genes)
+
+######################################
+
+
+# Assign column names (adjust these as necessary to match your data structure)
+colnames(interpro_data) <- c("Protein_ID", "MD5sum", "Length", "Database", "Database_Acc", 
+                             "Description", "Start", "End", "E-value", "Status", "Date", 
+                             "InterPro_ID", "InterPro_Desc", "GO_Terms", "Pathways")
+
+# View the data to ensure it loaded correctly
+head(interpro_data)
+
+# Filter for rows containing the term "nitrate" in either Description or InterPro_Desc
+nitrate_genes <- interpro_data %>%
+  filter(grepl("nitrate", Description, ignore.case = TRUE) | grepl("nitrate", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrate_genes)
+print(nitrate_genes$Protein_ID) # nitrate genes
+
+
+# Filter for rows containing the term "nitrite" in either Description or InterPro_Desc
+nitrite_genes <- interpro_data %>%
+  filter(grepl("nitrite", Description, ignore.case = TRUE) | grepl("nitrite", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrite_genes)
+print(nitrite_genes$Protein_ID) # nitrate genes
+
+# search for ammonium genes
+Ammonium_genes <- interpro_data %>%
+  filter(grepl("Ammonium", Description, ignore.case = TRUE) | grepl("Ammonium", InterPro_Desc, ignore.case = TRUE))
+
+print(Ammonium_genes)
+print(Ammonium_genes$Protein_ID)
