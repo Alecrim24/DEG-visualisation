@@ -1,0 +1,116 @@
+# Install and load the `readr` package if you haven’t already
+if (!requireNamespace("readr", quietly = TRUE)) {
+  install.packages("readr")
+}
+library(readr)
+
+# Define the file path and load the data
+interproscan_path <- "C:/Users/bop21gwh/Documents/PhD work/hisat/output_file_m.b.tsv"
+interpro_data <- read_tsv(interproscan_path)
+
+# Check the first few rows to ensure it loaded correctly
+head(interpro_data)
+
+# Check the column names and structure of the data
+colnames(interpro_data)
+head(interpro_data)
+
+
+# Examine the column names in your data to identify GO term or description columns
+colnames(interpro_data)
+
+# Assume there's a column with descriptions or GO terms, let's call it "Description" here
+# Adjust "Description" to the actual name in your data
+
+# Filter for rows containing the term "nitrate"
+nitrate_genes <- interpro_data %>%
+  filter(grepl("nitrate", Description, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+head(nitrate_genes)
+
+######################################
+
+
+# Assign column names (adjust these as necessary to match your data structure)
+colnames(interpro_data) <- c("Protein_ID", "MD5sum", "Length", "Database", "Database_Acc", 
+                             "Description", "Start", "End", "E-value", "Status", "Date", 
+                             "InterPro_ID", "InterPro_Desc", "GO_Terms", "Pathways")
+
+# View the data to ensure it loaded correctly
+head(interpro_data)
+
+# Filter for rows containing the term "nitrate" in either Description or InterPro_Desc
+nitrate_genes <- interpro_data %>%
+  filter(grepl("nitrate", Description, ignore.case = TRUE) | grepl("nitrate", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrate_genes)
+print(nitrate_genes$Protein_ID) # nitrate genes
+
+
+# Filter for rows containing the term "nitrite" in either Description or InterPro_Desc
+nitrite_genes <- interpro_data %>%
+  filter(grepl("nitrite", Description, ignore.case = TRUE) | grepl("nitrite", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrite_genes)
+print(nitrite_genes$Protein_ID) # nitrate genes
+
+# search for ammonium genes
+Ammonium_genes <- interpro_data %>%
+  filter(grepl("Ammonium", Description, ignore.case = TRUE) | grepl("Ammonium", InterPro_Desc, ignore.case = TRUE))
+
+print(Ammonium_genes)
+print(Ammonium_genes$Protein_ID)
+
+# now make a varaible with the list of genes related
+
+nitrogen_genes <- c("_ptg000020l_000523.1","_ptg000014l_000283.1","_ptg000023l_000078.1","_ptg000017l_000842.1","_ptg000017l_000842.1",
+                            "_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1",
+                            "_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000549.1","_ptg000023l_000333.1",
+                            "_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1",
+                            "_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000006l_000493.1","_ptg000006l_000493.1",
+                            "_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000023l_000333.1","_ptg000006l_000493.1",
+                            "_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000014l_000855.1")
+
+# Step 1: Count the number of genes in the nitrogen_genes list
+gene_count <- length(nitrogen_genes)
+cat("Number of genes:", gene_count, "\n")
+
+# Step 2: Remove the ".1" suffix from the gene IDs
+nitrogen_genes_cleaned <- gsub("\\.1$", "", nitrogen_genes)
+
+# Display cleaned genes
+head(nitrogen_genes_cleaned)
+count <- length(nitrogen_genes_cleaned)
+cat("Number of genes:", count, "\n")
+
+##################### what is here
+# Check for the presence of genes in dds_2
+gene_presence <- nitrogen_genes_cleaned %in% rownames(dds_2)
+print(gene_presence)  # Shows TRUE for present genes and FALSE for missing ones
+
+
+
+# Extract normalized counts from dds_2
+norm_counts <- counts(dds_2, normalized = TRUE)
+
+# Filter the normalized counts to include only nitrogen-related genes
+counts_nitrogen_genes <- norm_counts[rownames(norm_counts) %in% nitrogen_genes_cleaned, , drop = FALSE]
+
+# Check the subset to ensure it has values
+print(dim(counts_nitrogen_genes))
+print(counts_nitrogen_genes)
+
+
+Heatmap(
+  counts_nitrogen_genes, 
+  name = "Expression", 
+  cluster_rows = TRUE, 
+  cluster_columns = TRUE, 
+  show_row_names = TRUE, 
+  show_column_names = TRUE,
+  column_title = "Nitrogen Metabolism Genes Across Tissues",
+  row_title = "Genes"
+)
