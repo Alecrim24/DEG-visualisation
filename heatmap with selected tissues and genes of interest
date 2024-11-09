@@ -1,0 +1,467 @@
+library(readr)
+library(dplyr)
+
+# Define the file path and load the data
+interproscan_path <- "C:/Users/bop21gwh/Documents/PhD work/hisat/output_file_m.b.tsv"
+interpro_data <- read_tsv(interproscan_path)
+
+# Check the first few rows to ensure it loaded correctly
+head(interpro_data)
+
+# Check the column names and structure of the data
+colnames(interpro_data)
+
+# Assign column names (adjust these as necessary to match your data structure)
+colnames(interpro_data) <- c("Protein_ID", "MD5sum", "Length", "Database", "Database_Acc", 
+                             "Description", "Start", "End", "E-value", "Status", "Date", 
+                             "InterPro_ID", "InterPro_Desc", "GO_Terms", "Pathways")
+
+# View the data to ensure it loaded correctly
+head(interpro_data)
+
+# Filter for rows containing the term "nitrate" in either Description or InterPro_Desc
+nitrate_genes <- interpro_data %>%
+  filter(grepl("nitrate", Description, ignore.case = TRUE) | grepl("nitrate", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrate_genes)
+print(nitrate_genes$Protein_ID) # nitrate genes
+
+# Filter for rows containing the term "nitrite" in either Description or InterPro_Desc
+nitrite_genes <- interpro_data %>%
+  filter(grepl("nitrite", Description, ignore.case = TRUE) | grepl("nitrite", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrite_genes)
+print(nitrite_genes$Protein_ID) # nitrite genes
+
+# Filter for rows containing the term "Ammonium" in either Description or InterPro_Desc
+Ammonium_genes <- interpro_data %>%
+  filter(grepl("Ammonium", Description, ignore.case = TRUE) | grepl("Ammonium", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(Ammonium_genes)
+print(Ammonium_genes$Protein_ID) # Ammonium genes
+
+# Now create a variable with the list of all protein IDs related to these terms
+related_genes <- unique(c(nitrate_genes$Protein_ID, nitrite_genes$Protein_ID, Ammonium_genes$Protein_ID))
+
+# Print the list of related genes
+print(related_genes)
+
+
+###################### genes of interest sorted 
+###################### now remove the .1 to match the colnmes in the dds object
+
+# now make a varaible with the list of genes related
+
+nitrogen_genes <- c("_ptg000020l_000523.1","_ptg000014l_000283.1","_ptg000023l_000078.1","_ptg000017l_000842.1","_ptg000017l_000842.1",
+                    "_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1",
+                    "_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000549.1","_ptg000023l_000333.1",
+                    "_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1",
+                    "_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000006l_000493.1","_ptg000006l_000493.1",
+                    "_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000023l_000333.1","_ptg000006l_000493.1",
+                    "_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000014l_000855.1")
+
+# Step 1: Count the number of genes in the nitrogen_genes list
+gene_count <- length(nitrogen_genes)
+cat("Number of genes:", gene_count, "\n")
+
+# Step 2: Remove the ".1" suffix from the gene IDs
+nitrogen_genes_cleaned <- gsub("\\.1$", "", nitrogen_genes)
+
+# Display cleaned genes
+head(nitrogen_genes_cleaned)
+count <- length(nitrogen_genes_cleaned)
+cat("Number of genes:", count, "\n")
+
+
+############################ gene names processed 
+################ checking for the genes in the dds_2 object
+
+# Check for the presence of genes in dds_2
+gene_presence <- nitrogen_genes_cleaned %in% rownames(dds_2)
+print(gene_presence)  # Shows TRUE for present genes and FALSE for missing ones
+
+# Extract normalized counts from dds_2
+norm_counts <- counts(dds_2, normalized = TRUE)
+
+print(colnames(dds_2))
+
+# Filter the normalized counts to include only nitrogen-related genes
+counts_nitrogen_genes <- norm_counts[rownames(norm_counts) %in% nitrogen_genes_cleaned, , drop = FALSE]
+
+# Check the subset to ensure it has values
+print(dim(counts_nitrogen_genes))
+print(counts_nitrogen_genes)
+
+
+############################# vst object for visualising the data
+
+# Apply Variance Stabilizing Transformation (VST)
+ntd <- vst(dds_2, blind = FALSE)
+
+
+################################ pheatmap (option 1)
+
+library(pheatmap)
+select <- order(rowMeans(counts(dds_2,normalized=TRUE)),
+                decreasing=TRUE)[1:20]
+df <- as.data.frame(colData(dds_2)[,c("Plant","Tissue")])
+
+pheatmap(assay(ntd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+         cluster_cols=FALSE, annotation_col=df)
+
+################################# option 2
+
+select <- order(rowMeans(counts(dds_2, normalized = TRUE)),
+                decreasing = TRUE)[1:20]
+
+# Create the annotation data frame
+df <- as.data.frame(colData(dds_2)[, c("Plant", "Tissue")])
+
+# Extract the top 20 genes (selected rows) and create the heatmap
+pheatmap(assay(ntd)[select, ], 
+         cluster_rows = FALSE,               # Do not cluster rows (genes)
+         show_rownames = TRUE,               # Show gene names on the y-axis
+         cluster_cols = FALSE,               # Do not cluster columns (samples)
+         annotation_col = df,                # Annotate columns with metadata (Plant and Tissue)
+         main = "Heatmap of Top 20 Genes"    # Title for the heatmap
+)
+############################# option 3 with top 20 genes of interest in specified tissue
+
+library(ComplexHeatmap)
+
+# Select top 20 genes
+select <- order(rowMeans(counts(dds_2, normalized = TRUE)), decreasing = TRUE)[1:20]
+cat("Count data dimensions:", dim(dds_2), "\n")
+# Create the metadata dataframe with selected Plant and Tissue columns
+df_filt <- as.data.frame(colData(dds_2)[, c("Plant", "Tissue")])
+
+# Filter the data to focus on "Warty" tissues
+df_filt_warty <- df_filt[df_filt$Tissue %in% c("Warty"), ]
+
+print(df_filt_warty)
+counts_warty <- assay(dds_2)[select, , drop = FALSE]
+
+print(colnames(counts_warty))
+
+# Generate heatmap using ComplexHeatmap
+Heatmap(
+  counts_warty,                     # Expression data (top 20 genes)
+  name = "Expression",              # Name for the color scale
+  cluster_rows = TRUE,              # Cluster rows (genes)
+  cluster_columns = TRUE,           # Cluster columns (samples)
+  show_row_names = TRUE,            # Show row names (gene names)
+  show_column_names = TRUE,         # Show column names (sample names)
+  top_annotation = HeatmapAnnotation(
+    Tissue = df_filt_warty$Tissue,   # Annotate with Tissue info
+    annotation_name_side = "left",   # Position of annotation
+    col = list(Tissue = c("Warty" = "red"))  # Color for tissue annotation
+  ),
+  show_heatmap_legend = TRUE,       # Show legend
+  column_title = "Top 20 Genes for Warty Tissues",  # Title for heatmap
+  row_title = "Genes",              # Title for row axis
+  row_title_gp = gpar(fontsize = 12), # Adjust the font size for row title
+  column_title_gp = gpar(fontsize = 12) # Adjust the font size for column title
+)
+
+############## custom lables
+
+colnames(colData(dds_2))
+#metadata structure
+str(colData(dds_2))
+head(as.data.frame(colData(dds_2)))
+
+###################
+
+library(ComplexHeatmap)
+
+# Select the top 20 genes
+select <- order(rowMeans(counts(dds_2, normalized = TRUE)), decreasing = TRUE)[1:20]
+cat("Count data dimensions:", dim(dds_2), "\n")
+
+# Extract metadata with selected columns "Plant" and "Tissue"
+df_filt <- as.data.frame(colData(dds_2)[, c("Plant", "Tissue")])
+
+# Filter the data to focus on "Warty" tissues
+df_filt_warty <- df_filt[df_filt$Tissue %in% c("Warty"), ]
+print(df_filt_warty)
+
+# Subset count data for the selected genes and samples
+counts_warty <- assay(dds_2)[select, , drop = FALSE]
+print(colnames(counts_warty))
+
+# Match column names to the corresponding Tissue labels in metadata
+# Create a named vector for custom column labels
+custom_labels <- setNames(df_filt$Tissue, rownames(df_filt))[colnames(counts_warty)]
+
+# Generate heatmap with custom x-axis labels
+Heatmap(
+  counts_warty,                     # Expression data (top 20 genes)
+  name = "Expression",              # Name for the color scale
+  cluster_rows = TRUE,              # Cluster rows (genes)
+  cluster_columns = TRUE,           # Cluster columns (samples)
+  show_row_names = TRUE,            # Show row names (gene names)
+  show_column_names = TRUE,         # Show column names (sample names)
+  column_labels = custom_labels,    # Custom labels for x-axis (Tissue names)
+  top_annotation = HeatmapAnnotation(
+    Tissue = df_filt_warty$Tissue,   # Annotate with Tissue info
+    annotation_name_side = "left",   # Position of annotation
+    col = list(Tissue = c("Warty" = "red"))  # Color for tissue annotation
+  ),
+  show_heatmap_legend = TRUE,       # Show legend
+  column_title = "Top 20 Genes for Warty Tissues",  # Title for heatmap
+  row_title = "Genes",              # Title for row axis
+  row_title_gp = gpar(fontsize = 12), # Adjust the font size for row title
+  column_title_gp = gpar(fontsize = 12) # Adjust the font size for column title
+)
+######################
+library(ComplexHeatmap)
+
+# Define the specific sample names in the order you want them to appear
+samples_ordered <- c(
+  "X45.47.M_b.Fertilizer.P1.Control_cavity_warty_AGACGACAGA.GAGCTGGAAT_L007.hisat.sorted.bam",
+  "X52.54.M_b.Fertilizer.P2.Control_cavity_warty_ACTCGTCCAG.TGGTCCTCGT_L007.hisat.sorted.bam",
+  "X59.61.M_b.Fertilizer.P3.Control_cavity_warty_CTCTCTCTAG.ACTTGATTGG_L007.hisat.sorted.bam",
+  "X46.48.M_b.Fertilizer.P1.Control_cavity_smooth_TAGGTCCAGA.TGCTCATCCG_L007.hisat.sorted.bam",
+  "X53.55.M_b.Fertilizer.P2.Control_cavity_smooth_TCCGGAGAAC.ATTCCTCTGG_L007.hisat.sorted.bam",
+  "X60.62.M_b.Fertilizer.P3.Control_cavity_smooth_AAGGCTCCAT.TGAAGATGGA_L007.hisat.sorted.bam"
+)
+
+# Filter and reorder metadata based on the selected and ordered samples
+df_filt_selected <- df_filt[rownames(df_filt) %in% samples_ordered, ]
+df_filt_selected <- df_filt_selected[samples_ordered, ]
+
+# Filter and reorder count data based on the selected and ordered samples
+counts_selected <- assay(dds_2)[select, samples_ordered, drop = FALSE]
+
+# Create custom labels using the reordered metadata
+custom_labels <- setNames(df_filt_selected$Tissue, rownames(df_filt_selected))[colnames(counts_selected)]
+
+# Generate the heatmap with reordered data and custom labels
+Heatmap(
+  counts_selected,                    # Expression data (top 20 genes for selected samples)
+  name = "Expression",                # Name for the color scale
+  cluster_rows = TRUE,                # Cluster rows (genes)
+  cluster_columns = FALSE,            # Do not cluster columns (preserve order)
+  show_row_names = TRUE,              # Show row names (gene names)
+  show_column_names = TRUE,           # Show column names (sample names)
+  column_labels = custom_labels,      # Custom labels for x-axis (Tissue names)
+  top_annotation = HeatmapAnnotation(
+    Tissue = df_filt_selected$Tissue, # Annotate with Tissue info
+    annotation_name_side = "left",    # Position of annotation
+    col = list(Tissue = c("Warty" = "red", "Smooth" = "blue"))  # Colors for tissue types
+  ),
+  show_heatmap_legend = TRUE,         # Show legend
+  column_title = "Top 20 Genes for Selected Samples",  # Title for heatmap
+  row_title = "Genes",                # Title for row axis
+  row_title_gp = gpar(fontsize = 12), # Adjust the font size for row title
+  column_title_gp = gpar(fontsize = 12) # Adjust the font size for column title
+)
+
+
+
+
+################# ants vs no ants
+
+library(ComplexHeatmap)
+
+# Define the new sample names in the desired order
+samples_ordered_2 <- c(
+  "X29.31.M_b.No_ants.P1.Warty_GTGACACGTC.CTTACACTGA_L007.hisat.sorted.bam",
+  "X33.35.M_b.No_ants.P2.Warty_GATAGACAAC.GTGTTCACGT_L007.hisat.sorted.bam",
+  "X37.39.M_b.No_ants.P3.Warty_GTTCTCATCA.CCTCCATTCT_L007.hisat.sorted.bam",
+  "X62.64.M_b.Control_ants.P1.Warty_GCAGAAGTCT.CTGCGTCGAA_L007.hisat.sorted.bam",
+  "X66.68.M_b.Control_ants.P2.Warty_CAAGACGGAC.GTACTCCGTC_L007.hisat.sorted.bam",
+  "X70.72.M_b.Control_ants.P3.Warty_TGTCGGTGCT.AGTTCTTCCG_L007.hisat.sorted.bam"
+)
+
+# Filter and reorder metadata based on the selected and ordered samples
+df_filt_selected <- df_filt[rownames(df_filt) %in% samples_ordered_2, ]
+df_filt_selected <- df_filt_selected[samples_ordered_2, ]
+
+# Filter and reorder count data based on the selected and ordered samples
+counts_selected <- assay(dds_2)[select, samples_ordered_2, drop = FALSE]
+
+# Create custom labels using the reordered metadata
+custom_labels <- setNames(df_filt_selected$Tissue, rownames(df_filt_selected))[colnames(counts_selected)]
+
+# Generate the heatmap with reordered data and custom labels
+Heatmap(
+  counts_selected,                    # Expression data (top 20 genes for selected samples)
+  name = "Expression",                # Name for the color scale
+  cluster_rows = TRUE,                # Cluster rows (genes)
+  cluster_columns = FALSE,            # Do not cluster columns (preserve order)
+  show_row_names = TRUE,              # Show row names (gene names)
+  show_column_names = TRUE,           # Show column names (sample names)
+  column_labels = custom_labels,      # Custom labels for x-axis (Tissue names)
+  top_annotation = HeatmapAnnotation(
+    Tissue = df_filt_selected$Tissue, # Annotate with Tissue info
+    annotation_name_side = "left",    # Position of annotation
+    col = list(Tissue = c("Warty" = "red"))  # Color for tissue annotation (assuming all are "Warty")
+  ),
+  show_heatmap_legend = TRUE,         # Show legend
+  column_title = "Top 20 Genes for Selected Samples",  # Title for heatmap
+  row_title = "Genes",                # Title for row axis
+  row_title_gp = gpar(fontsize = 12), # Adjust the font size for row title
+  column_title_gp = gpar(fontsize = 12) # Adjust the font size for column title
+)
+########################
+library(ComplexHeatmap)
+
+# Define the new sample names in the desired order
+samples_ordered <- c(
+  "X29.31.M_b.No_ants.P1.Warty_GTGACACGTC.CTTACACTGA_L007.hisat.sorted.bam",
+  "X33.35.M_b.No_ants.P2.Warty_GATAGACAAC.GTGTTCACGT_L007.hisat.sorted.bam",
+  "X37.39.M_b.No_ants.P3.Warty_GTTCTCATCA.CCTCCATTCT_L007.hisat.sorted.bam",
+  "X62.64.M_b.Control_ants.P1.Warty_GCAGAAGTCT.CTGCGTCGAA_L007.hisat.sorted.bam",
+  "X66.68.M_b.Control_ants.P2.Warty_CAAGACGGAC.GTACTCCGTC_L007.hisat.sorted.bam",
+  "X70.72.M_b.Control_ants.P3.Warty_TGTCGGTGCT.AGTTCTTCCG_L007.hisat.sorted.bam"
+)
+
+# Clean the gene IDs by removing the ".1" suffix
+nitrogen_genes_cleaned <- gsub("\\.1$", "", nitrogen_genes)
+
+# Filter for genes present in the dataset
+gene_presence <- nitrogen_genes_cleaned %in% rownames(dds_2)
+nitrogen_genes_present <- nitrogen_genes_cleaned[gene_presence]
+
+# Extract normalized counts for nitrogen-related genes from dds_2
+norm_counts <- counts(dds_2, normalized = TRUE)
+counts_nitrogen_genes <- norm_counts[rownames(norm_counts) %in% nitrogen_genes_present, samples_ordered, drop = FALSE]
+
+# Filter and reorder metadata based on the selected and ordered samples
+df_filt_selected <- df_filt[rownames(df_filt) %in% samples_ordered, ]
+df_filt_selected <- df_filt_selected[samples_ordered, ]
+
+# Create custom labels using the reordered metadata
+custom_labels <- setNames(df_filt_selected$Tissue, rownames(df_filt_selected))[colnames(counts_nitrogen_genes)]
+
+# Generate the heatmap with nitrogen-related gene data and custom labels
+Heatmap(
+  counts_nitrogen_genes,              # Expression data (nitrogen-related genes)
+  name = "Expression",                # Name for the color scale
+  cluster_rows = TRUE,                # Cluster rows (genes)
+  cluster_columns = FALSE,            # Do not cluster columns (preserve order)
+  show_row_names = TRUE,              # Show row names (gene names)
+  show_column_names = TRUE,           # Show column names (sample names)
+  column_labels = custom_labels,      # Custom labels for x-axis (Tissue names)
+  top_annotation = HeatmapAnnotation(
+    Tissue = df_filt_selected$Tissue, # Annotate with Tissue info
+    annotation_name_side = "left",    # Position of annotation
+    col = list(Tissue = c("Warty" = "red"))  # Colors for tissue types
+  ),
+  show_heatmap_legend = TRUE,         # Show legend
+  column_title = "Nitrogen-Related Genes for Selected Samples",  # Title for heatmap
+  row_title = "Nitrogen Genes",       # Title for row axis
+  row_title_gp = gpar(fontsize = 12), # Adjust the font size for row title
+  column_title_gp = gpar(fontsize = 12) # Adjust the font size for column title
+)
+#################################### Generating the genes of interest
+
+if (!requireNamespace("readr", quietly = TRUE)) {
+  install.packages("readr")
+}
+library(readr)
+
+# Define the file path and load the data
+interproscan_path <- "C:/Users/bop21gwh/Documents/PhD work/hisat/output_file_m.b.tsv"
+interpro_data <- read_tsv(interproscan_path)
+
+# Check the first few rows to ensure it loaded correctly
+head(interpro_data)
+
+# Check the column names and structure of the data
+colnames(interpro_data)
+head(interpro_data)
+
+
+# Examine the column names in your data to identify GO term or description columns
+colnames(interpro_data)
+
+# Assume there's a column with descriptions or GO terms, let's call it "Description" here
+# Adjust "Description" to the actual name in your data
+
+# Filter for rows containing the term "nitrate"
+nitrate_genes <- interpro_data %>%
+  filter(grepl("nitrate", Description, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrate_genes)
+
+######################################
+
+
+# Assign column names (adjust these as necessary to match your data structure)
+colnames(interpro_data) <- c("Protein_ID", "MD5sum", "Length", "Database", "Database_Acc", 
+                             "Description", "Start", "End", "E-value", "Status", "Date", 
+                             "InterPro_ID", "InterPro_Desc", "GO_Terms", "Pathways")
+
+# View the data to ensure it loaded correctly
+head(interpro_data)
+
+# Filter for rows containing the term "nitrate" in either Description or InterPro_Desc
+nitrate_genes <- interpro_data %>%
+  filter(grepl("nitrate", Description, ignore.case = TRUE) | grepl("nitrate", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrate_genes)
+print(nitrate_genes$Protein_ID) # nitrate genes
+
+
+# Filter for rows containing the term "nitrite" in either Description or InterPro_Desc
+nitrite_genes <- interpro_data %>%
+  filter(grepl("nitrite", Description, ignore.case = TRUE) | grepl("nitrite", InterPro_Desc, ignore.case = TRUE))
+
+# Check the first few rows of the filtered data
+print(nitrite_genes)
+print(nitrite_genes$Protein_ID) # nitrate genes
+
+# search for ammonium genes
+Ammonium_genes <- interpro_data %>%
+  filter(grepl("Ammonium", Description, ignore.case = TRUE) | grepl("Ammonium", InterPro_Desc, ignore.case = TRUE))
+
+print(Ammonium_genes)
+print(Ammonium_genes$Protein_ID)
+
+# now make a varaible with the list of genes related
+
+nitrogen_genes <- c("_ptg000020l_000523.1","_ptg000014l_000283.1","_ptg000023l_000078.1","_ptg000017l_000842.1","_ptg000017l_000842.1",
+                    "_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1",
+                    "_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000842.1","_ptg000017l_000549.1","_ptg000023l_000333.1",
+                    "_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1",
+                    "_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000023l_000333.1","_ptg000006l_000493.1","_ptg000006l_000493.1",
+                    "_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000023l_000333.1","_ptg000006l_000493.1",
+                    "_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000006l_000493.1","_ptg000014l_000855.1")
+
+# Step 1: Count the number of genes in the nitrogen_genes list
+gene_count <- length(nitrogen_genes)
+cat("Number of genes:", gene_count, "\n")
+
+# Step 2: Remove the ".1" suffix from the gene IDs
+nitrogen_genes_cleaned <- gsub("\\.1$", "", nitrogen_genes)
+
+# Display cleaned genes
+head(nitrogen_genes_cleaned)
+count <- length(nitrogen_genes_cleaned)
+cat("Number of genes:", count, "\n")
+
+##################### what is here
+# Check for the presence of genes in dds_2
+gene_presence <- nitrogen_genes_cleaned %in% rownames(dds_2)
+print(gene_presence)  # Shows TRUE for present genes and FALSE for missing ones
+
+
+
+# Extract normalized counts from dds_2
+norm_counts <- counts(dds_2, normalized = TRUE)
+
+print(colnames(dds_2))
+
+# Filter the normalized counts to include only nitrogen-related genes
+counts_nitrogen_genes <- norm_counts[rownames(norm_counts) %in% nitrogen_genes_cleaned, , drop = FALSE]
+
+# Check the subset to ensure it has values
+print(dim(counts_nitrogen_genes))
+print(counts_nitrogen_genes)
